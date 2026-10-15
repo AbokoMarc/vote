@@ -28,6 +28,7 @@
 </head>
 <body>
 <div class="app" id="app"></div>
+<script src="/media.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -90,7 +91,7 @@ function form(e) {
 function render(d, cands) {
   const e = d.election, up = new Date(d.updated);
   const cardC = (c) => `<div class="rec" style="align-items:flex-start;flex-wrap:wrap"><img src="${esc(c.photo)}" alt="" style="width:56px;height:56px;border-radius:14px;object-fit:cover"><div class="t"><b>${esc(c.name)}</b> · ${esc(c.role)} · ${esc(c.klass)}<br>
-    <span style="font-size:13px;color:#5b564c">${esc(c.bio.slice(0, 160))}${c.bio.length > 160 ? '…' : ''}</span><br><span style="font-size:12.5px;color:#6b665c">${c.promises.length} promesse(s) · vidéo ${esc(c.pitchDur || '?')} ${c.durChecked ? '(durée vérifiée)' : '(durée non vérifiée par le serveur)'}</span></div>
+    <span style="font-size:13px;color:#5b564c">${esc(c.bio.slice(0, 160))}${c.bio.length > 160 ? '…' : ''}</span><br><span style="font-size:12.5px;color:#6b665c">${c.promises.length} promesse(s) · vidéo ${esc(c.pitchDur || '?')} ${c.durChecked ? '(durée vérifiée)' : '(durée à vérifier en regardant la vidéo)'}</span></div>
     <div style="width:100%;display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${c.videoPitchOk ? `<button class="btn" data-v="${esc(c.videoPitch)}" style="background:#1B1B1F;box-shadow:none;padding:8px 14px;font-size:14px">▶ Voir la vidéo</button>` : ''}
     ${!locked && (c.status === 'pending' || c.status === 'rejected') ? `<button class="btn" data-ok="${c.id}" style="padding:8px 14px;font-size:14px">Valider</button>` : ''}
     ${!locked && (c.status === 'pending' || c.status === 'approved') ? `<button class="btn ghost" data-no="${c.id}" style="padding:8px 14px;font-size:14px">${c.status === 'approved' ? 'Retirer' : 'Refuser'}</button>` : ''}
@@ -111,7 +112,7 @@ function render(d, cands) {
   <div class="foot">Données mises à jour • ${up.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} ${hm(up)}</div>
   <p class="out"><button class="btn ghost" id="ed" style="padding:10px 18px">Modifier les dates</button></p>`;
   $('#bk').onclick = home; $('#ed').onclick = () => form(e);
-  app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { const x = document.createElement('div'); x.className = 'vid-bg'; x.innerHTML = `<video src="${esc(b.dataset.v)}" controls autoplay playsinline></video><button>Fermer</button>`; x.querySelector('button').onclick = () => x.remove(); document.body.appendChild(x); });
+  app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => openVideo(b.dataset.v));
   app.querySelectorAll('[data-ok]').forEach(b => b.onclick = async () => { try { await J('POST', `/api/admin/candidacies/${b.dataset.ok}/approve`, {}); detail(e.id); } catch (er) { alert(er.message); } });
   app.querySelectorAll('[data-no]').forEach(b => b.onclick = async () => { const note = prompt('Motif (affiché au candidat, optionnel) :') ; if (note === null) return; try { await J('POST', `/api/admin/candidacies/${b.dataset.no}/reject`, { note }); detail(e.id); } catch (er) { alert(er.message); } });
 }

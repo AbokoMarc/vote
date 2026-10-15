@@ -10,6 +10,7 @@
 <body>
 <div class="app" id="app"></div>
 <script src="/fp.js"></script>
+<script src="/media.js"></script>
 <script>
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -151,22 +152,25 @@ function viewApply() {
   <textarea class="field" id="f_bio" rows="4" maxlength="800" placeholder="Ta bio (20 caractères minimum)"></textarea>
   <h2>Programme (1 à 5 promesses)</h2>${prom.map(i => `<input class="field" id="p${i}t" placeholder="Promesse ${i + 1} : titre court" maxlength="40" style="margin-bottom:6px"><input class="field" id="p${i}d" placeholder="Détail" maxlength="120">`).join('')}
   <h2>Une question d'étudiant (optionnel)</h2><input class="field" id="q_q" placeholder="Question" maxlength="120" style="margin-bottom:6px"><input class="field" id="q_a" placeholder="Ta réponse" maxlength="200">
-  <h2>Photo</h2><input class="field" id="f_photo" type="file" accept="image/jpeg,image/png,image/webp">
-  <h2>Vidéo de présentation (30 s max)</h2><input class="field" id="f_video" type="file" accept="video/mp4,video/webm"><p class="note" style="text-align:left;margin:-4px 0 8px" id="vinfo">MP4 ou WebM, 40 Mo max.</p>
+  <h2>Photo</h2><input class="field" id="f_photo" type="file" accept="image/*"><p class="note" style="text-align:left;margin:-4px 0 8px" id="pinfo">Une photo de ton visage (elle sera réduite automatiquement).</p>
+  <h2>Vidéo de présentation (30 s max)</h2><input class="field" id="f_video" type="url" inputmode="url" placeholder="Lien YouTube ou Google Drive"><p class="note" style="text-align:left;margin:-4px 0 8px">Envoie ta vidéo sur YouTube en « non répertoriée » ou sur Google Drive (accès : « toute personne disposant du lien »), puis colle le lien ici.</p>
   <p class="err" id="err"></p><button class="btn wide" id="send">Envoyer ma candidature</button>`;
   $('#bk').onclick = viewList;
-  let secs = 0;
-  $('#f_video').onchange = (ev) => { const f = ev.target.files[0]; if (!f) return; const v = document.createElement('video'); v.preload = 'metadata'; v.src = URL.createObjectURL(f);
-    v.onloadedmetadata = () => { secs = v.duration; URL.revokeObjectURL(v.src); $('#vinfo').textContent = secs > 31 ? `Vidéo de ${Math.round(secs)} s : trop longue (30 s max).` : `Durée : ${Math.round(secs)} s`; if (secs > 31) ev.target.value = ''; }; };
+  let photoData = null;
+  $('#f_photo').onchange = async (ev) => {
+    const f = ev.target.files[0]; if (!f) return; photoData = null;
+    try {
+      const bmp = await createImageBitmap(f), side = Math.min(bmp.width, bmp.height), size = Math.min(480, side), cv = document.createElement('canvas'); cv.width = cv.height = size;
+      cv.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
+      photoData = cv.toDataURL('image/jpeg', 0.85); $('#pinfo').textContent = 'Photo prête (' + Math.round(photoData.length * 0.75 / 1024) + ' Ko).';
+    } catch (e) { $('#pinfo').textContent = 'Image illisible. Essaie une photo JPG ou PNG.'; ev.target.value = ''; }
+  };
   $('#send').onclick = async () => {
     const promises = prom.map(i => [$('#p' + i + 't').value, $('#p' + i + 'd').value]).filter(p => p[0].trim() && p[1].trim());
-    const data = { electionId: e.id, name: $('#f_name').value, role: $('#f_role').value, klass: $('#f_klass').value, bio: $('#f_bio').value, promises, qa: $('#q_q').value.trim() ? [[$('#q_q').value, $('#q_a').value]] : [], videoSeconds: secs };
-    const fd = new FormData(); fd.append('data', JSON.stringify(data));
-    if ($('#f_photo').files[0]) fd.append('photo', $('#f_photo').files[0]); if ($('#f_video').files[0]) fd.append('video', $('#f_video').files[0]);
+    const data = { electionId: e.id, name: $('#f_name').value, role: $('#f_role').value, klass: $('#f_klass').value, bio: $('#f_bio').value, promises, qa: $('#q_q').value.trim() ? [[$('#q_q').value, $('#q_a').value]] : [], videoUrl: $('#f_video').value, photo: photoData };
     const b = $('#send'); b.disabled = true; b.textContent = 'Envoi en cours…';
-    try { const r = await fetch('/api/candidacy', { method: 'POST', body: fd }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Erreur');
-      toast('Candidature envoyée.'); await openElection(e.id);
-    } catch (er) { $('#err').textContent = er.message; b.disabled = false; b.textContent = 'Envoyer ma candidature'; }
+    try { await api('/api/candidacy', data); toast('Candidature envoyée.'); await openElection(e.id); }
+    catch (er) { $('#err').textContent = er.message; b.disabled = false; b.textContent = 'Envoyer ma candidature'; }
   };
 }
 
@@ -186,11 +190,7 @@ function viewDetail(id) {
   $('#bk').onclick = viewList; if ($('#vt')) $('#vt').onclick = () => confirmVote(id);
   app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => playVideo(id, b.dataset.v));
 }
-function playVideo(id, key) {
-  const c = S.data.candidates.find(x => x.id === id), d = document.createElement('div'); d.className = 'vid-bg';
-  d.innerHTML = `<video src="${esc(c[key])}" controls autoplay playsinline></video><button>Fermer</button>`;
-  d.querySelector('button').onclick = () => d.remove(); document.body.appendChild(d);
-}
+function playVideo(id, key) { openVideo(S.data.candidates.find(x => x.id === id)[key]); }
 
 // ---------- vote ----------
 function confirmVote(id) {

@@ -10,10 +10,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "@libsql/client": "^0.18.0",
     "cookie-parser": "^1.4.7",
     "express": "^5.3.0",
-    "multer": "^2.4.0",
     "nodemailer": "^10.1.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

@@ -1,41 +1,37 @@
-# VOGT ELECTIONS 2026
+# VOGT ELECTIONS - hébergement 100 % gratuit (Render + Turso)
 
-## Lancer
-0. Si tu mets à jour une ancienne version : supprime `vogt.db` (le schéma a changé).
-1. Installer Node.js 20+ (https://nodejs.org)
-2. `npm install`
-3. `cp .env.example .env` puis remplir (SECRET, SMTP_*, BDE_KEYS, GHOST_KEY, ELIGIBLE_VOTERS)
-4. `npm start` puis ouvrir http://localhost:3000
+Pages : `/` étudiant · `/admin` BDE · `/ghost` quarantaine (URL non liée).
 
-Pages : `/` étudiant, `/admin` BDE (lecture seule), `/ghost` quarantaine (URL non liée).
+## 1. Base de données Turso (gratuit)
+1. Crée un compte sur https://turso.tech puis une base (ex. `vogt`). Choisis une région en Europe (Frankfurt ou Paris).
+2. Récupère l'URL (`libsql://vogt-xxxx.turso.io`) et crée un **token d'accès** (dashboard, ou CLI : `turso db show vogt --url` et `turso db tokens create vogt`).
+3. Les tables se créent toutes seules au premier démarrage.
 
-## Emails réels
-Sans SMTP_HOST, le code s'affiche seulement dans la console (mode test, aucun email envoyé).
-Gmail : activer la validation en 2 étapes, créer un "mot de passe d'application", puis
-SMTP_HOST=smtp.gmail.com, SMTP_PORT=587, SMTP_USER=ton@gmail.com, SMTP_PASS=mot de passe d'application.
-Alternatives : Brevo, Resend, Mailjet (SMTP).
+## 2. Emails (gratuit)
+Prends un service SMTP gratuit (Brevo, Resend, Mailjet...). Vérifie l'adresse d'expéditeur chez eux et note leur limite d'envois par jour.
+Variables : SMTP_HOST, SMTP_PORT (587), SMTP_USER, SMTP_PASS, MAIL_FROM.
+Sans SMTP, le code s'affiche dans les logs (mode test uniquement).
 
-## Élections multiples
-- Admin BDE (`/admin`) et Ghost (`/ghost`, onglet Élections) peuvent créer plusieurs élections, chacune avec 4 dates : ouverture/fermeture des candidatures, ouverture/fermeture du vote.
-- Les dates sont appliquées par le serveur : impossible de candidater ou de voter hors fenêtre.
-- Une fois les premiers votes reçus, seul le Ghost peut modifier les dates de vote. Dès que le vote ouvre, les candidatures sont figées.
-- Un même téléphone peut voter dans deux élections différentes, mais pas deux fois dans la même.
-- Les résultats par candidat s'affichent à l'admin seulement après la clôture du vote.
-- L'élection de démonstration est créée au premier lancement à partir de `candidates.json`. Supprime-la ou ignore-la ensuite.
+## 3. Serveur Render (gratuit)
+1. Mets le dossier sur GitHub (dépôt privé). `.gitignore` exclut déjà `.env` et `node_modules`.
+2. Sur https://render.com : New > Blueprint (il lit `render.yaml`) ou New > Web Service (build `npm install`, start `npm start`, offre Free).
+3. Renseigne les variables : TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, BDE_KEYS, GHOST_KEY, SMTP_*, MAIL_FROM, ELIGIBLE_VOTERS. `SECRET` est généré automatiquement : ne le change jamais ensuite.
+4. Ouvre l'adresse `https://xxx.onrender.com`.
 
-## Candidatures
-Un étudiant vérifié par email envoie sa candidature (bio, 1 à 5 promesses, photo, vidéo de 30 s max). Elle reste "en attente" jusqu'à validation par le BDE ou le Ghost, qui peuvent la valider ou la refuser avec un motif. La durée de la vidéo est vérifiée côté serveur si `ffprobe` (paquet ffmpeg) est installé, sinon seulement côté navigateur : l'admin voit alors "durée non vérifiée" et regarde la vidéo avant de valider. Les fichiers sont dans `public/uploads`.
+### Limite du gratuit : la mise en veille
+Render met le service en veille après 15 min sans visite et le réveil prend environ une minute. Pour l'éviter le jour du vote, crée un moniteur gratuit (UptimeRobot ou cron-job.org) qui appelle `https://xxx.onrender.com/api/health` toutes les 5 minutes. Vérifie les quotas d'heures gratuites de Render pour ton compte.
 
-## Candidats, photos, vidéos (élection de démonstration)
-- Textes : `candidates.json`
-- Photos : remplacer `public/photos/*.svg` (ou mettre des .jpg et changer le chemin dans le JSON)
-- Vidéos : remplacer `public/videos/<id>-pitch.mp4` (30 s) et `<id>-full.mp4` (optionnel). Les vidéos fournies sont des placeholders.
-- Un bouton vidéo n'apparaît que si le fichier existe.
+## Photos et vidéos
+Un hébergeur gratuit n'a pas de disque durable, donc :
+- La **photo** est réduite dans le navigateur (480 px) puis stockée dans Turso.
+- La **vidéo** (30 s) est un **lien YouTube (non répertorié) ou Google Drive**, intégré dans l'app. Le serveur ne peut pas mesurer la durée : le BDE regarde la vidéo avant de valider.
+- Les vidéos de démonstration de `public/videos` sont de simples fichiers du dépôt.
 
-## Sécurité
-- Code 4 chiffres : valable 10 min, 5 essais max, 3 envois / 10 min / email, stocké hashé.
-- Emails jamais stockés : seulement un hash (HMAC). Le matricule vu par le Ghost vient de la partie avant @ (ex. 21g0201).
-- 1 téléphone = 1 vote : empreinte (canvas, WebGL, audio, polices, écran, CPU, fuseau) + identifiant persistant.
-  Un second email sur le même téléphone met l'appareil en quarantaine et les deux votes passent "suspect" (non comptés) jusqu'à décision du Ghost.
-- Limite connue : une empreinte n'est pas infaillible. Deux téléphones identiques peuvent se ressembler, et un étudiant malin peut changer de navigateur. Le Ghost peut restaurer les faux positifs. Pour durcir : ALLOWED_DOMAIN (emails de l'école uniquement).
-- En production : HTTPS, COOKIE_SECURE=1, TRUST_PROXY=1 derrière un proxy.
+## Test en local
+`npm install`, `cp .env.example .env`, `npm start`. Sans variables TURSO_*, un fichier `vogt.db` local est utilisé.
+
+## Élections, sécurité (rappel)
+- Plusieurs élections, chacune avec 4 dates appliquées par le serveur. Dates de vote verrouillées pour le BDE dès le premier vote.
+- Code email à 4 chiffres : 10 min, 5 essais, hashé. Emails jamais stockés (hash seulement).
+- 1 téléphone = 1 vote par élection (empreinte + identifiant persistant) : doublon = quarantaine, votes "suspects" non comptés jusqu'à décision du Ghost.
+- Limite : une empreinte n'est pas infaillible (faux positifs possibles, contournement par un autre navigateur). Utilise ALLOWED_DOMAIN pour n'accepter que les emails de l'école.
