@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Admin BDE</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+.ah{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 14px}
+.ah h1{font-size:21px;font-weight:600;letter-spacing:-.01em;margin:0;line-height:1.2}
+.live{background:var(--accent);color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.wave{display:flex;align-items:center;gap:2px;height:14px}.wave i{width:2.5px;background:#8BE08B;border-radius:2px;display:block}
+.wave i:nth-child(1){height:6px}.wave i:nth-child(2){height:12px}.wave i:nth-child(3){height:8px}.wave i:nth-child(4){height:13px}
+@media (prefers-reduced-motion:no-preference){.wave i{animation:w 1.1s ease-in-out infinite}.wave i:nth-child(2){animation-delay:.15s}.wave i:nth-child(3){animation-delay:.3s}.wave i:nth-child(4){animation-delay:.45s}@keyframes w{50%{transform:scaleY(.45)}}}
+.watch{display:flex;align-items:center;gap:8px;color:#58534a;font-size:14px;margin-bottom:16px}
+.stats{display:flex;gap:12px;margin-bottom:26px}
+.stat{flex:1;background:var(--tile);border-radius:18px;padding:18px 8px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;min-height:150px;justify-content:space-between}
+.stat .l{font-size:14.5px;line-height:1.25;color:#2e2c28}.stat .v{font-size:25px;font-weight:600;letter-spacing:-.01em}
+.stat svg{width:42px;height:42px;stroke:var(--accent);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rec{background:var(--tile);border-radius:16px;padding:14px 14px;display:flex;align-items:center;gap:12px;margin-bottom:12px;font-size:15px;line-height:1.35;color:#2b2925}
+.rec .t{flex:1}.rec svg{flex:none}
+.rec.bad{background:#EFE0D8}
+.foot{background:var(--tile);border-radius:14px;text-align:center;padding:14px;font-size:14px;color:#4b473f;margin-top:6px}
+.bk{margin:0 0 22px}.bk div{display:flex;justify-content:space-between;padding:10px 4px;border-bottom:1px solid #E6DCC6;font-size:15px}
+.out{margin-top:22px;text-align:center}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const app = $('#app'); let timer, cur = null, role = 'bde';
+const J = (m, u, b) => fetch(u, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }).then(async r => { if (r.status === 401) { login(); throw new Error('auth'); } const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Erreur'); return j; });
+const clock = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6b665c" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+const lock = '<svg width="22" height="22" viewBox="0 0 24 24" fill="#8a857a"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 018 0v2.5" fill="none" stroke="#8a857a" stroke-width="2"/></svg>';
+const eye = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7a756a" stroke-width="1.8"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const ICON = {
+  box: '<svg viewBox="0 0 48 48"><path d="M6 24h36v16a2 2 0 01-2 2H8a2 2 0 01-2-2z"/><path d="M6 24l5-8h26l5 8"/><path d="M19 30h10"/><path d="M17 8l14-3 3 11-14 3z" transform="rotate(8 24 12)"/></svg>',
+  part: '<svg viewBox="0 0 48 48"><circle cx="13" cy="12" r="4"/><path d="M13 5v-2M13 21v-3"/><path d="M5 40v-9a6 6 0 016-6h4"/><rect x="22" y="22" width="7" height="20"/><rect x="31" y="14" width="7" height="28"/><rect x="40" y="8" width="4" height="34"/></svg>',
+  warn: '<svg viewBox="0 0 48 48"><path d="M24 6L4 41h40z"/><path d="M24 19v10M24 34v.5"/></svg>'
+};
+const PH = { upcoming: 'Bientôt', registration: 'Candidatures ouvertes', between: 'Vote à venir', voting: 'Vote ouvert', closed: 'Terminé' };
+const dt = (t) => new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const hm = (ts) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const toLocalInput = (t) => { const d = new Date(t - new Date(t).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+function ghostBar() { return role === 'ghost' ? `<p style="margin:0 0 8px"><a class="link" href="/ghost" style="text-decoration:none">‹ Quarantaine</a></p>` : ''; }
+
+function login(err) {
+  clearInterval(timer);
+  app.innerHTML = `<div class="kicker o" style="margin-top:26px">VOGT ELECTIONS</div><h1 style="font-size:32px;margin:14px 0 8px">Admin BDE</h1><p class="sub">Crée les élections, valide les candidatures, surveille les chiffres.</p>
+  <input class="field" id="k" type="password" autocomplete="current-password" placeholder="Clé BDE"><p class="err" id="e">${esc(err || '')}</p><button class="btn wide" id="g">Entrer</button>`;
+  const go = async () => { const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: $('#k').value }) }); if (r.ok) return home(); const j = await r.json().catch(() => ({})); $('#e').textContent = j.error || 'Erreur'; };
+  $('#g').onclick = go; $('#k').onkeydown = e => e.key === 'Enter' && go();
+}
+
+// ---------- liste des élections ----------
+async function home() {
+  clearInterval(timer); cur = null; window.scrollTo(0, 0);
+  const d = await J('GET', '/api/admin/elections'); role = d.role;
+  app.innerHTML = `${ghostBar()}<div class="ah"><h1>Élections</h1><button class="btn" id="new" style="padding:9px 14px;font-size:14px">+ Nouvelle</button></div>
+  <div class="watch">${eye}<span>Tu ne vois que des chiffres. Aucun email.</span></div>
+  ${d.elections.map(e => `<div class="rec el" data-id="${e.id}" tabindex="0" style="cursor:pointer"><div class="t"><b>${esc(e.name)}</b><br><span style="font-size:13px;color:#6b665c">${PH[e.phase]} · ${e.votes} vote${e.votes > 1 ? 's' : ''}${e.pending ? ` · <b style="color:var(--accent)">${e.pending} candidature${e.pending > 1 ? 's' : ''} à valider</b>` : ''}</span></div><span style="font-size:24px;color:var(--accent)">›</span></div>`).join('') || '<div class="rec"><div class="t">Aucune élection.</div></div>'}
+  <p class="out"><button class="link" id="lo">Se déconnecter</button></p>`;
+  $('#new').onclick = () => form(null);
+  app.querySelectorAll('.el').forEach(el => { el.onclick = () => detail(+el.dataset.id); el.onkeydown = e => e.key === 'Enter' && el.onclick(); });
+  $('#lo').onclick = async () => { await J('POST', '/api/logout', {}); login(); };
+}
+
+// ---------- formulaire élection ----------
+function form(e) {
+  clearInterval(timer); window.scrollTo(0, 0);
+  const t = Date.now(), H = 3600e3, D = 24 * H, v = e || { name: '', reg_open: t, reg_close: t + 7 * D, vote_open: t + 8 * D, vote_close: t + 10 * D, eligible: 1000 };
+  const f = (id, label, val) => `<label style="display:block;font-size:14px;margin:0 0 6px;color:#4b473f">${label}</label><input class="field" type="datetime-local" id="${id}" value="${toLocalInput(val)}">`;
+  app.innerHTML = `<p style="margin:0 0 8px"><button class="link" id="bk" style="padding:0">‹ Retour</button></p><h1 style="font-size:30px;margin:10px 0 18px">${e ? 'Modifier l\'élection' : 'Nouvelle élection'}</h1>
+  <label style="display:block;font-size:14px;margin:0 0 6px;color:#4b473f">Nom</label><input class="field" id="n" value="${esc(v.name)}" maxlength="80" placeholder="Ex. Élection BDE 2026">
+  ${f('ro', 'Ouverture des candidatures', v.reg_open)}${f('rc', 'Fermeture des candidatures', v.reg_close)}${f('vo', 'Ouverture du vote', v.vote_open)}${f('vc', 'Fermeture du vote', v.vote_close)}
+  <label style="display:block;font-size:14px;margin:0 0 6px;color:#4b473f">Nombre d'étudiants inscrits (pour la participation)</label><input class="field" id="el" type="number" min="1" value="${v.eligible}">
+  <p class="err" id="e"></p><button class="btn wide" id="sv">${e ? 'Enregistrer' : 'Créer l\'élection'}</button>`;
+  $('#bk').onclick = () => e ? detail(e.id) : home();
+  $('#sv').onclick = async () => {
+    const ms = (id) => new Date($(id).value).getTime();
+    const body = { name: $('#n').value, reg_open: ms('#ro'), reg_close: ms('#rc'), vote_open: ms('#vo'), vote_close: ms('#vc'), eligible: +$('#el').value };
+    try { const r = await J(e ? 'PUT' : 'POST', '/api/admin/elections' + (e ? '/' + e.id : ''), body); e ? detail(e.id) : detail(r.id); } catch (er) { $('#e').textContent = er.message; }
+  };
+}
+
+// ---------- détail d'une élection ----------
+function render(d, cands) {
+  const e = d.election, up = new Date(d.updated);
+  const cardC = (c) => `<div class="rec" style="align-items:flex-start;flex-wrap:wrap"><img src="${esc(c.photo)}" alt="" style="width:56px;height:56px;border-radius:14px;object-fit:cover"><div class="t"><b>${esc(c.name)}</b> · ${esc(c.role)} · ${esc(c.klass)}<br>
+    <span style="font-size:13px;color:#5b564c">${esc(c.bio.slice(0, 160))}${c.bio.length > 160 ? '…' : ''}</span><br><span style="font-size:12.5px;color:#6b665c">${c.promises.length} promesse(s) · vidéo ${esc(c.pitchDur || '?')} ${c.durChecked ? '(durée vérifiée)' : '(durée non vérifiée par le serveur)'}</span></div>
+    <div style="width:100%;display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${c.videoPitchOk ? `<button class="btn" data-v="${esc(c.videoPitch)}" style="background:#1B1B1F;box-shadow:none;padding:8px 14px;font-size:14px">▶ Voir la vidéo</button>` : ''}
+    ${!locked && (c.status === 'pending' || c.status === 'rejected') ? `<button class="btn" data-ok="${c.id}" style="padding:8px 14px;font-size:14px">Valider</button>` : ''}
+    ${!locked && (c.status === 'pending' || c.status === 'approved') ? `<button class="btn ghost" data-no="${c.id}" style="padding:8px 14px;font-size:14px">${c.status === 'approved' ? 'Retirer' : 'Refuser'}</button>` : ''}
+    <span class="play" style="margin-left:auto;align-self:center">${c.status === 'pending' ? 'en attente' : c.status === 'approved' ? 'validé' : 'refusé'}</span></div></div>`;
+  const locked = ['voting', 'closed'].includes(e.phase);
+  app.innerHTML = `${ghostBar()}<p style="margin:0 0 8px"><button class="link" id="bk" style="padding:0">‹ Élections</button></p>
+  <div class="ah"><h1>${esc(e.name)}</h1><div class="live">${e.phase === 'voting' ? 'En direct <span class="wave"><i></i><i></i><i></i><i></i></span>' : PH[e.phase]}</div></div>
+  <div class="watch">${eye}<span>${esc(PH[e.phase])} · vote du ${dt(e.vote_open)} au ${dt(e.vote_close)}</span></div>
+  <div class="stats">
+    <div class="stat">${ICON.box}<div class="l">Votes</div><div class="v">${d.votes.toLocaleString('fr-FR')}</div></div>
+    <div class="stat">${ICON.part}<div class="l">Participation</div><div class="v">${d.participation.toLocaleString('fr-FR', { minimumFractionDigits: 1 })}%</div></div>
+    <div class="stat">${ICON.warn}<div class="l">Invalides par Système</div><div class="v">${d.invalids.toLocaleString('fr-FR')}</div></div></div>
+  ${d.breakdown ? `<h2 style="font-size:20px;margin:0 0 8px">Résultats</h2><div class="bk">${d.breakdown.map(b => `<div><span>${esc(b.name)}</span><b>${b.votes}</b></div>`).join('')}</div>` : ''}
+  <h2 style="font-size:22px;margin:0 0 14px">Candidatures</h2>${locked ? '<p class="note" style="text-align:left;margin:-6px 0 12px">Le vote a commencé : les candidatures sont figées.</p>' : ''}
+  <div id="cands">${cands.length ? cands.map(cardC).join('') : '<div class="rec"><div class="t">Aucune candidature pour le moment.</div></div>'}</div>
+  <h2 style="font-size:22px;margin:20px 0 14px">Votes récents</h2>
+  ${d.recent.length ? d.recent.map(r => `<div class="rec ${r.rejected ? 'bad' : ''}">${clock}<div class="t">${hm(r.ts)} • ID #${r.id} • ${esc(r.label)}</div>${lock}</div>`).join('') : '<div class="rec"><div class="t">Aucun vote pour le moment.</div></div>'}
+  <div class="foot">Données mises à jour • ${up.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} ${hm(up)}</div>
+  <p class="out"><button class="btn ghost" id="ed" style="padding:10px 18px">Modifier les dates</button></p>`;
+  $('#bk').onclick = home; $('#ed').onclick = () => form(e);
+  app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { const x = document.createElement('div'); x.className = 'vid-bg'; x.innerHTML = `<video src="${esc(b.dataset.v)}" controls autoplay playsinline></video><button>Fermer</button>`; x.querySelector('button').onclick = () => x.remove(); document.body.appendChild(x); });
+  app.querySelectorAll('[data-ok]').forEach(b => b.onclick = async () => { try { await J('POST', `/api/admin/candidacies/${b.dataset.ok}/approve`, {}); detail(e.id); } catch (er) { alert(er.message); } });
+  app.querySelectorAll('[data-no]').forEach(b => b.onclick = async () => { const note = prompt('Motif (affiché au candidat, optionnel) :') ; if (note === null) return; try { await J('POST', `/api/admin/candidacies/${b.dataset.no}/reject`, { note }); detail(e.id); } catch (er) { alert(er.message); } });
+}
+async function detail(id) {
+  clearInterval(timer); cur = id; window.scrollTo(0, 0);
+  const load = async (keepScroll) => { const [d, c] = await Promise.all([J('GET', '/api/admin/stats?election=' + id), J('GET', '/api/admin/candidacies?election=' + id)]); role = d.role; const y = scrollY; render(d, c.list); if (keepScroll) scrollTo(0, y); };
+  await load(false);
+  timer = setInterval(() => { if (!document.querySelector('.vid-bg')) load(true).catch(() => {}); }, 8000);
+}
+home().catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Quarantaine</title>
+<meta name="theme-color" content="#0D0D0F">
+<style>
+:root{--bg:#0D0D0F;--card:#1B1B1E;--card2:#232327;--ink:#F4F4F5;--mute:#9A9AA2;--or:#F28A38;--yel:#F5C542;--red:#F0564E;--grn:#9BE39B}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,"SF Pro Display",Roboto,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.app{max-width:440px;margin:0 auto;padding:max(22px,env(safe-area-inset-top)) 18px 120px;min-height:100vh}
+button{font:inherit;cursor:pointer;border:0;color:inherit}
+h1{font-size:44px;letter-spacing:-.025em;font-weight:700;margin:22px 0 6px;display:flex;align-items:center;gap:12px}
+h1 svg{width:44px;height:44px;flex:none}
+.sub{color:var(--mute);font-size:16px;margin:0 0 20px}
+.search{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:0 14px;height:52px;margin-bottom:12px;border:1px solid #2A2A2F}
+.search input{flex:1;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:15px;min-width:0}
+.search input::placeholder{color:#8a8a92}
+.force{display:flex;justify-content:flex-end;background:var(--card);border-radius:14px;padding:12px;margin-bottom:16px}
+.force button{background:var(--or);color:#1a1006;font-weight:700;border-radius:10px;padding:11px 16px;font-size:15px}
+.tiles{display:flex;gap:12px;margin-bottom:26px}
+.t{flex:1;background:var(--card);border-radius:14px;padding:14px 14px 14px;border:1px solid #2A2A2F}
+.t .ic{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.t .dot{width:7px;height:7px;border-radius:50%}
+.t b{font-size:30px;display:block;font-weight:700;line-height:1}.t span{font-size:16.5px;font-weight:500}
+.t.y{color:var(--yel)}.t.y .dot{background:var(--yel)}.t.r{color:var(--red)}.t.r .dot{background:var(--red)}.t.w .dot{background:#fff}
+.sec{color:var(--mute);font-size:13.5px;letter-spacing:.03em;margin:0 0 12px;text-transform:uppercase}
+.row{background:var(--card);border-radius:14px;padding:14px 14px;margin-bottom:12px;border:1px solid #26262A}
+.row .id{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:14px;line-height:1.5;margin-bottom:11px;color:#E8E8EA}
+.row .id i{color:var(--or);font-style:normal}
+.tags{display:flex;flex-wrap:wrap;gap:8px}
+.tag{font-family:ui-monospace,Menlo,monospace;font-size:13px;padding:6px 10px;border-radius:8px;background:var(--card2);color:#d4d4d8}
+.tag.inv{background:transparent;border:1px solid var(--or);color:var(--or)}
+.tag:active{opacity:.7}
+.tag.done{opacity:.4;pointer-events:none}
+.manual{border-top:1px solid #2A2A2F;margin-top:26px;padding-top:20px}
+.manual h3{margin:0 0 8px;font-size:19px}.manual p{margin:0;color:#B4B4BB;font-size:14.5px;line-height:1.5}
+.nav{position:fixed;left:0;right:0;bottom:0;background:#141416;border-top:1px solid #26262A;padding:10px 14px max(14px,env(safe-area-inset-bottom))}
+.nav div{max-width:412px;margin:0 auto;display:flex;gap:8px}
+.nav button{flex:1;min-width:0;background:none;border-radius:12px;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--mute);font-size:13px}
+.nav button.on{background:#26262A;color:#fff}
+.nav svg{width:22px;height:22px}
+.in{width:100%;background:var(--card);border:1px solid #2A2A2F;border-radius:14px;padding:15px;color:var(--ink);font:inherit;margin-bottom:12px;outline:0}
+.in:focus{border-color:var(--or)}
+.go{width:100%;background:var(--or);color:#1a1006;font-weight:700;border-radius:12px;padding:15px;font-size:16px}
+.err{color:var(--red);font-size:14px;min-height:18px;margin:0 0 10px}
+.log{font-family:ui-monospace,Menlo,monospace;font-size:13px;padding:11px 0;border-bottom:1px solid #222226;color:#d4d4d8}.log i{color:var(--mute);font-style:normal}
+.kv{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #222226;font-size:15px}.kv span{color:var(--mute)}
+.bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.sheet{background:#18181B;border-radius:22px 22px 0 0;padding:22px 20px max(26px,env(safe-area-inset-bottom));width:100%;max-width:440px;max-height:85vh;overflow:auto;border:1px solid #2A2A2F}
+.sheet h3{margin:0 0 14px;font-size:20px}.sheet .mono{font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all;color:#d4d4d8}
+.empty{color:var(--mute);text-align:center;padding:26px 0;font-size:15px}
+.toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:#fff;color:#000;padding:11px 16px;border-radius:12px;font-size:14px;z-index:20}
+:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const app = $('#app'); let tab = 'root', q = '';
+const GHOST = '<svg viewBox="0 0 48 48"><path d="M10 42V22C10 12 16 6 24 6s14 6 14 16v20l-5-4-4.5 4-4.5-4-4.5 4-4.5-4z" fill="#D9D9DE"/><circle cx="19" cy="22" r="2.6" fill="#0D0D0F"/><circle cx="29" cy="22" r="2.6" fill="#0D0D0F"/><ellipse cx="24" cy="30" rx="3" ry="3.6" fill="#0D0D0F"/></svg>';
+const NAVI = {
+  root: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 21V10a7 7 0 0114 0v11l-3-2.4-2 2.4-2-2.4-2 2.4-2-2.4z"/></svg>',
+  logs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>',
+  elec: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9l2-5h4l2 5M9 14h6"/></svg>',
+  set: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.4 13a7.5 7.5 0 000-2l2-1.6-2-3.4-2.4 1a7 7 0 00-1.7-1L15 3.5h-4l-.4 2.5a7 7 0 00-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 000 2l-2 1.6 2 3.4 2.4-1a7 7 0 001.7 1l.4 2.5h4l.4-2.5a7 7 0 001.7-1l2.4 1 2-3.4zM13 15.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z"/></svg>'
+};
+async function api(path, body) {
+  const r = await fetch(path, body !== undefined ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  if (r.status === 401) { login(); throw new Error('auth'); }
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Erreur'); return j;
+}
+function toast(t) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
+function login(err) {
+  app.innerHTML = `<h1>${GHOST}Accès</h1><p class="sub">Zone restreinte.</p><input class="in" id="k" type="password" placeholder="Clé" autocomplete="current-password"><p class="err" id="e">${esc(err || '')}</p><button class="go" id="g">Entrer</button>`;
+  const go = async () => { const r = await fetch('/api/ghost/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: $('#k').value }) }); if (r.ok) return show(); const j = await r.json().catch(() => ({})); $('#e').textContent = j.error || 'Refusé'; };
+  $('#g').onclick = go; $('#k').onkeydown = e => e.key === 'Enter' && go();
+}
+function navbar() {
+  return `<div class="nav"><div>${[['root', 'Root'], ['elec', 'Élections'], ['logs', 'Logs'], ['set', 'Paramètres']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-t="${k}">${NAVI[k]}${l}</button>`).join('')}</div></div>`;
+}
+function bindNav() { app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { if (b.dataset.t === 'elec') return location.href = '/admin'; tab = b.dataset.t; show(); }); }
+
+async function show() {
+  if (tab === 'logs') {
+    const d = await api('/api/ghost/logs');
+    app.innerHTML = `<h1>${GHOST}Logs</h1><p class="sub">Journal des actions. Rien n'est effacé.</p>${d.logs.length ? d.logs.map(l => `<div class="log"><i>${new Date(l.ts).toLocaleString('fr-FR')}</i><br>${esc(l.action)} • ${esc(l.target)}</div>`).join('') : '<div class="empty">Aucune action.</div>'}${navbar()}`;
+    return bindNav();
+  }
+  if (tab === 'set') {
+    const s = await api('/api/ghost/settings');
+    app.innerHTML = `<h1>${GHOST}Réglages</h1><p class="sub">Lecture seule (fichier .env).</p>
+    <div class="kv"><span>Inscrits attendus</span>${s.eligible}</div><div class="kv"><span>Changements max</span>${s.maxChanges}</div><div class="kv"><span>Domaine email</span>${esc(s.domain)}</div>
+    <div class="kv"><span>Envoi email (SMTP)</span>${s.smtp ? 'actif' : 'NON configuré'}</div><div class="kv"><span>Clés BDE</span>${s.admins}</div><div class="kv"><span>Appareils en quarantaine</span>${s.quarantinedDevices}</div>
+    <p style="margin-top:26px"><button class="tag" id="lo">Se déconnecter</button></p>${navbar()}`;
+    bindNav(); $('#lo').onclick = async () => { await api('/api/logout', {}); login(); }; return;
+  }
+  const d = await api('/api/ghost/overview?q=' + encodeURIComponent(q));
+  const row = (v) => `<div class="row"><div class="id"><i>•</i> #${v.id} • ${esc(v.label)} • IP x${v.ipCount} •<br><span style="color:#9a9aa2">${esc(v.election)}</span> •<br>${v.reason ? esc(v.reason) : 'statut ' + esc(v.status)}${v.status === 'invalid' ? ' • <i>invalidé</i>' : ''}</div>
+    <div class="tags"><button class="tag inv ${v.status === 'invalid' ? 'done' : ''}" data-a="invalidate" data-id="${v.id}">[invalider]</button><button class="tag" data-a="restore" data-id="${v.id}">[restaurer]</button><button class="tag" data-a="proof" data-id="${v.id}">[voir preuve]</button></div></div>`;
+  const keep = document.activeElement && document.activeElement.id === 'q';
+  app.innerHTML = `<h1>${GHOST}Quarantaine</h1><p class="sub">Seule page où tu peux agir. Invisible.</p>
+  <div class="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9a9aa2" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="q" placeholder="Chercher matricule ex: 21G0201..." value="${esc(q)}" autocomplete="off" autocapitalize="characters"></div>
+  <div class="force"><button id="force">[FORCER INVALIDE]</button></div>
+  <div class="tiles"><div class="t y"><div class="ic"><span class="dot"></span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></div><b>${d.suspects}</b><span>suspects</span></div>
+  <div class="t r"><div class="ic"><span class="dot"></span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 9l6 6M15 9l-6 6"/></svg></div><b>${d.invalids}</b><span>invalides</span></div>
+  <div class="t w"><div class="ic"><span class="dot"></span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><circle cx="12" cy="11" r="2.4"/><path d="M8 17c1-2.5 7-2.5 8 0"/></svg></div><b>${d.admins}</b><span>admins</span></div></div>
+  <p class="sec">Activité suspecte • ${d.list.length} élément${d.list.length > 1 ? 's' : ''}</p>
+  ${d.list.length ? d.list.map(row).join('') : '<div class="empty">Rien de suspect.</div>'}
+  ${d.found.length ? `<p class="sec" style="margin-top:22px">Résultat de recherche</p>${d.found.map(row).join('')}` : ''}
+  <div class="manual"><h3>Action Manuelle</h3><p>Contourner les protocoles via override local. Toute action est journalisée et irréversible hors restauration. Utiliser uniquement en cas d'urgence avérée.</p></div>${navbar()}`;
+  bindNav();
+  const inp = $('#q'); let t; inp.oninput = () => { q = inp.value; clearTimeout(t); t = setTimeout(show, 350); }; if (keep) { inp.focus(); inp.setSelectionRange(q.length, q.length); }
+  $('#force').onclick = async () => {
+    const m = inp.value.trim(); if (!m) return toast('Saisis un matricule.');
+    if (!confirm('FORCER INVALIDE le vote de ' + m.toUpperCase() + ' ?')) return;
+    try { await api('/api/ghost/force', { matricule: m }); toast('Vote invalidé.'); show(); } catch (e) { toast(e.message); }
+  };
+  app.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.id, a = b.dataset.a;
+    if (a === 'proof') return proof(id);
+    if (!confirm(a === 'invalidate' ? 'Invalider ce vote ?' : 'Restaurer ce vote (il sera à nouveau compté) ?')) return;
+    try { await api('/api/ghost/' + a + '/' + id, {}); toast(a === 'invalidate' ? 'Invalidé.' : 'Restauré.'); show(); } catch (e) { toast(e.message); }
+  });
+}
+async function proof(id) {
+  const p = await api('/api/ghost/proof/' + id), bg = document.createElement('div'); bg.className = 'bg';
+  const f = (l, v) => `<div class="kv"><span>${l}</span><div class="mono" style="text-align:right;max-width:62%">${v}</div></div>`;
+  bg.innerHTML = `<div class="sheet"><h3>Preuve • ${esc(p.label)}</h3>${f('Statut', esc(p.status))}${f('Motif', esc(p.reason || '-'))}${f('Empreinte', esc(p.fp))}${f('Appareil', esc(p.device))}${f('IP', esc(p.ip))}${f('Navigateur', esc(p.ua))}${f('Dernière activité', new Date(p.updated).toLocaleString('fr-FR'))}
+  ${f('Même téléphone', p.sameDevice.length ? p.sameDevice.map(x => '#' + x.id + ' ' + esc(x.label) + ' (' + esc(x.status) + ')').join('<br>') : 'aucun')}${f('Même IP', p.sameIp.length ? p.sameIp.map(x => '#' + x.id + ' ' + esc(x.label)).join('<br>') : 'aucun')}
+  <p style="color:#9a9aa2;font-size:13px;margin:14px 0">Un même IP (wifi campus) n'est pas une preuve. Le critère décisif est l'empreinte identique.</p><button class="go" id="cl">Fermer</button></div>`;
+  document.body.appendChild(bg); bg.onclick = e => { if (e.target === bg || e.target.id === 'cl') bg.remove(); };
+}
+fetch('/api/ghost/overview').then(r => r.ok ? show() : login());
+setInterval(() => { if (tab === 'root' && !document.querySelector('.bg') && document.activeElement.id !== 'q') fetch('/api/ghost/overview?q=' + encodeURIComponent(q)).then(r => r.ok && show()); }, 15000);
+</script>
+</body>
+</html>

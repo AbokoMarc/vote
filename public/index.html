@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>VOGT ELECTIONS 2026</title>
+<meta name="theme-color" content="#FDF6E8">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="/fp.js"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const app = $('#app');
+const S = { email: '', data: null, device: null, view: 'login' };
+const PLAY = '<svg viewBox="0 0 10 10"><path d="M1 0l9 5-9 5z"/></svg>';
+const PLAYW = '<svg viewBox="0 0 10 10"><path d="M1 0l9 5-9 5z"/></svg>';
+
+VogtDevice().then(d => S.device = d).catch(() => {});
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.error || 'Erreur'); e.status = r.status; e.data = j; throw e; }
+  return j;
+}
+function toast(t) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 3200); }
+
+const MAP = `<svg class="map" viewBox="0 0 176 128" role="img" aria-label="Carte du campus"><rect width="176" height="128" fill="#CFE5C4"/>
+<path d="M0 90C40 70 70 96 110 70s50-20 66-30v88H0z" fill="#BFDDB2"/><path d="M-5 30C30 40 50 20 90 34s60 8 90-6" stroke="#fff" stroke-width="4" fill="none" opacity=".9"/>
+<path d="M60 -5C66 30 52 60 70 90s6 30 14 44" stroke="#F4EFD8" stroke-width="3.5" fill="none"/><path d="M0 64C40 60 80 74 120 58s40-8 60-2" stroke="#F4EFD8" stroke-width="3" fill="none"/>
+<circle cx="30" cy="100" r="16" fill="#B7D8AA" opacity=".8"/><circle cx="140" cy="94" r="13" fill="#B7D8AA" opacity=".8"/>
+<g font-size="8.5" fill="#3d4a3a" font-family="Arial"><text x="32" y="22">Schlier</text><text x="116" y="18">Wolfegg</text><text x="14" y="116">Waldburg</text></g>
+<path d="M88 40c-7 0-12 5-12 11 0 8 12 20 12 20s12-12 12-20c0-6-5-11-12-11z" fill="#D9432B"/><circle cx="88" cy="51" r="4.2" fill="#fff"/></svg>`;
+
+function head() { return `<div class="kicker">VOGT ELECTIONS 2026</div>${MAP}`; }
+
+// ---------- connexion ----------
+function viewLogin(err) {
+  S.view = 'login';
+  app.innerHTML = `${head()}<h1>Votre campus.<br><em>Votre voix.</em></h1>
+  <p class="sub">Entre ton email pour recevoir ton code à 4 chiffres.</p>
+  <input class="field" id="em" type="email" inputmode="email" autocomplete="email" placeholder="ton.email@campus.fr" value="${esc(S.email)}">
+  <p class="err" id="err">${esc(err || '')}</p>
+  <button class="btn wide" id="go">Recevoir mon code</button>
+  <p class="note">Un vote par étudiant, un téléphone par vote.</p>`;
+  const go = async () => {
+    const b = $('#go'); S.email = $('#em').value.trim(); b.disabled = true; b.textContent = 'Envoi…';
+    try { await api('/api/otp/request', { email: S.email }); viewCode(); }
+    catch (e) { $('#err').textContent = e.message; b.disabled = false; b.textContent = 'Recevoir mon code'; }
+  };
+  $('#go').onclick = go; $('#em').onkeydown = e => { if (e.key === 'Enter') go(); };
+}
+function viewCode(err) {
+  S.view = 'code';
+  app.innerHTML = `${head()}<h1>Entre ton<br><em>code.</em></h1>
+  <p class="sub">Code envoyé à <b>${esc(S.email)}</b>. Il est valable 10 minutes.</p>
+  <div class="codes">${[0, 1, 2, 3].map(i => `<input inputmode="numeric" maxlength="1" autocomplete="${i ? 'off' : 'one-time-code'}" aria-label="Chiffre ${i + 1}">`).join('')}</div>
+  <p class="err" id="err" style="text-align:center">${esc(err || '')}</p>
+  <button class="btn wide" id="ok">Débloquer le vote</button>
+  <p class="note"><button class="link" id="again">Renvoyer un code</button> · <button class="link" id="chg">Changer d'email</button></p>`;
+  const ins = [...app.querySelectorAll('.codes input')];
+  ins.forEach((el, i) => {
+    el.oninput = () => { el.value = el.value.replace(/\D/g, '').slice(-1); if (el.value && ins[i + 1]) ins[i + 1].focus(); if (ins.every(x => x.value)) check(); };
+    el.onkeydown = e => { if (e.key === 'Backspace' && !el.value && ins[i - 1]) ins[i - 1].focus(); };
+    el.onpaste = e => { const t = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 4); if (t) { e.preventDefault(); t.split('').forEach((c, k) => ins[k].value = c); check(); } };
+  });
+  ins[0].focus();
+  async function check() {
+    const code = ins.map(x => x.value).join(''); if (code.length < 4) return;
+    $('#ok').disabled = true;
+    try { await api('/api/otp/verify', { email: S.email, code }); await loadList(); }
+    catch (e) { $('#err').textContent = e.message; $('#ok').disabled = false; ins.forEach(x => x.value = ''); ins[0].focus(); }
+  }
+  $('#ok').onclick = check;
+  $('#again').onclick = async () => { try { await api('/api/otp/request', { email: S.email }); toast('Nouveau code envoyé.'); } catch (e) { $('#err').textContent = e.message; } };
+  $('#chg').onclick = () => viewLogin();
+}
+
+// ---------- élections ----------
+const PH = { upcoming: 'Bientôt', registration: 'Candidatures ouvertes', between: 'Vote à venir', voting: 'Vote ouvert', closed: 'Terminé' };
+const dt = (t) => new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+function phaseLine(e) {
+  return { upcoming: `Candidatures dès le ${dt(e.reg_open)}`, registration: `Candidatures jusqu'au ${dt(e.reg_close)} · Vote dès le ${dt(e.vote_open)}`,
+    between: `Le vote ouvre le ${dt(e.vote_open)}`, voting: `Vote jusqu'au ${dt(e.vote_close)}`, closed: `Clôturé le ${dt(e.vote_close)}` }[e.phase];
+}
+async function loadList() {
+  try { S.elections = (await api('/api/elections')).elections; } catch (e) { return viewLogin(e.status === 401 ? '' : e.message); }
+  viewElections();
+}
+function viewElections() {
+  S.view = 'elections'; window.scrollTo(0, 0);
+  app.innerHTML = `${head()}<h1>Votre campus.<br><em>Votre voix.</em></h1><p class="sub">Choisis une élection.</p>
+  ${S.elections.length ? S.elections.map(e => `<div class="card cand el" data-id="${e.id}" tabindex="0"><div class="meta"><p class="n">${esc(e.name)}</p>
+    <div class="r">${esc(phaseLine(e))}</div><span class="play ph-${e.phase}">${PH[e.phase]}</span>${e.voted ? ' <span class="play" style="background:#E4F4E4;color:#1d5a1d">Tu as voté</span>' : ''}</div><span style="font-size:26px;color:var(--accent)">›</span></div>`).join('') : '<div class="banner">Aucune élection pour le moment.</div>'}
+  <p class="note"><button class="link" id="out">Changer de compte</button></p>`;
+  app.querySelectorAll('.el').forEach(el => { el.onclick = () => openElection(+el.dataset.id); el.onkeydown = e => e.key === 'Enter' && el.onclick(); });
+  $('#out').onclick = async () => { await api('/api/logout', {}); viewLogin(); };
+}
+async function openElection(id) {
+  try { S.data = await api('/api/elections/' + id); } catch (e) { return e.status === 401 ? viewLogin('') : toast(e.message); }
+  viewList();
+}
+function status() {
+  const m = S.data.me, ph = S.data.election.phase;
+  if (!m.voted) return '';
+  if (m.status !== 'valid') return `<div class="banner warn">Ton vote est en cours de vérification par le comité.</div>`;
+  const left = m.changesLeft;
+  return `<div class="banner">Tu as déjà voté pour <b>${esc(m.candidateName)}</b>.<br>${ph !== 'voting' ? '' : left > 0 ? `Il te reste <b>${left} changement${left > 1 ? 's' : ''}</b> sur ${S.data.maxChanges}.` : `Tu as utilisé tes ${S.data.maxChanges} changements : ton vote est définitif.`}</div>`;
+}
+function phaseBanner() {
+  const e = S.data.election, c = S.data.myCandidacy;
+  let h = `<div class="banner"><b>${PH[e.phase]}</b> · ${esc(phaseLine(e))}</div>`;
+  if (e.phase === 'registration') {
+    if (c && c.status === 'approved') h += `<div class="banner">Ta candidature est <b>validée</b>.</div>`;
+    else {
+      if (c) h += `<div class="banner ${c.status === 'rejected' ? 'warn' : ''}">Ta candidature est <b>${c.status === 'pending' ? 'en attente de validation' : 'refusée'}</b>.${c.note ? '<br>Motif : ' + esc(c.note) : ''}</div>`;
+      h += `<button class="btn wide" id="apply" style="margin-bottom:18px">${c ? 'Modifier ma candidature' : 'Me porter candidat'}</button>`;
+    }
+  }
+  return h;
+}
+function viewList() {
+  S.view = 'list'; window.scrollTo(0, 0);
+  const m = S.data.me, e = S.data.election, voting = e.phase === 'voting';
+  app.innerHTML = `<div class="top"><button class="back" id="bk">‹ Élections</button></div><div class="kicker">${esc(e.name)}</div>${MAP}<h1>Votre campus.<br><em>Votre voix.</em></h1>
+  <p class="sub">${S.data.candidates.length} candidat${S.data.candidates.length > 1 ? 's' : ''}, vidéos 30s, vote anonyme</p>${phaseBanner()}${status()}
+  ${S.data.candidates.map(c => `<div class="card cand" data-id="${c.id}">
+    <img src="${esc(c.photo)}" alt="${esc(c.name)}">
+    <div class="meta"><p class="n">${esc(c.name)}</p><div class="r">${esc(c.role)} • ${esc(c.klass)}</div>
+    ${c.videoPitchOk ? `<span class="play" data-play="${c.id}">${PLAY}${esc(c.pitchDur || '0:30')}</span>` : ''}</div>
+    ${voting ? `<button class="btn" data-vote="${c.id}">${m.voted && m.candidateId === c.id ? 'Ton vote' : 'Voter'}</button>` : (c.votes !== undefined ? `<b style="font-size:20px">${c.votes}</b>` : '')}</div>`).join('') || '<div class="banner">Aucun candidat validé pour l\'instant.</div>'}`;
+  $('#bk').onclick = () => loadList();
+  if ($('#apply')) $('#apply').onclick = viewApply;
+  app.querySelectorAll('.cand').forEach(el => el.onclick = e => {
+    const id = +el.dataset.id;
+    if (e.target.closest('[data-vote]')) return confirmVote(id);
+    if (e.target.closest('[data-play]')) return playVideo(id, 'videoPitch');
+    viewDetail(id);
+  });
+}
+
+// ---------- candidature ----------
+function viewApply() {
+  S.view = 'apply'; window.scrollTo(0, 0);
+  const e = S.data.election, prom = [0, 1, 2, 3, 4];
+  app.innerHTML = `<div class="top"><button class="back" id="bk">‹ Retour</button></div><div class="kicker o">${esc(e.name)}</div><h1 style="font-size:34px">Ma candidature</h1>
+  <p class="sub">Elle sera relue par le BDE avant d'apparaître.</p>
+  <input class="field" id="f_name" placeholder="Nom affiché (ex. A. MENDO)" maxlength="60"><input class="field" id="f_role" placeholder="Poste visé (ex. Présidente)" maxlength="50"><input class="field" id="f_klass" placeholder="Classe (ex. N4 GI)" maxlength="30">
+  <textarea class="field" id="f_bio" rows="4" maxlength="800" placeholder="Ta bio (20 caractères minimum)"></textarea>
+  <h2>Programme (1 à 5 promesses)</h2>${prom.map(i => `<input class="field" id="p${i}t" placeholder="Promesse ${i + 1} : titre court" maxlength="40" style="margin-bottom:6px"><input class="field" id="p${i}d" placeholder="Détail" maxlength="120">`).join('')}
+  <h2>Une question d'étudiant (optionnel)</h2><input class="field" id="q_q" placeholder="Question" maxlength="120" style="margin-bottom:6px"><input class="field" id="q_a" placeholder="Ta réponse" maxlength="200">
+  <h2>Photo</h2><input class="field" id="f_photo" type="file" accept="image/jpeg,image/png,image/webp">
+  <h2>Vidéo de présentation (30 s max)</h2><input class="field" id="f_video" type="file" accept="video/mp4,video/webm"><p class="note" style="text-align:left;margin:-4px 0 8px" id="vinfo">MP4 ou WebM, 40 Mo max.</p>
+  <p class="err" id="err"></p><button class="btn wide" id="send">Envoyer ma candidature</button>`;
+  $('#bk').onclick = viewList;
+  let secs = 0;
+  $('#f_video').onchange = (ev) => { const f = ev.target.files[0]; if (!f) return; const v = document.createElement('video'); v.preload = 'metadata'; v.src = URL.createObjectURL(f);
+    v.onloadedmetadata = () => { secs = v.duration; URL.revokeObjectURL(v.src); $('#vinfo').textContent = secs > 31 ? `Vidéo de ${Math.round(secs)} s : trop longue (30 s max).` : `Durée : ${Math.round(secs)} s`; if (secs > 31) ev.target.value = ''; }; };
+  $('#send').onclick = async () => {
+    const promises = prom.map(i => [$('#p' + i + 't').value, $('#p' + i + 'd').value]).filter(p => p[0].trim() && p[1].trim());
+    const data = { electionId: e.id, name: $('#f_name').value, role: $('#f_role').value, klass: $('#f_klass').value, bio: $('#f_bio').value, promises, qa: $('#q_q').value.trim() ? [[$('#q_q').value, $('#q_a').value]] : [], videoSeconds: secs };
+    const fd = new FormData(); fd.append('data', JSON.stringify(data));
+    if ($('#f_photo').files[0]) fd.append('photo', $('#f_photo').files[0]); if ($('#f_video').files[0]) fd.append('video', $('#f_video').files[0]);
+    const b = $('#send'); b.disabled = true; b.textContent = 'Envoi en cours…';
+    try { const r = await fetch('/api/candidacy', { method: 'POST', body: fd }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Erreur');
+      toast('Candidature envoyée.'); await openElection(e.id);
+    } catch (er) { $('#err').textContent = er.message; b.disabled = false; b.textContent = 'Envoyer ma candidature'; }
+  };
+}
+
+// ---------- détail ----------
+function viewDetail(id) {
+  const c = S.data.candidates.find(x => x.id === id), m = S.data.me, voting = S.data.election.phase === 'voting'; S.view = 'detail'; window.scrollTo(0, 0);
+  app.innerHTML = `<div class="top"><button class="back" id="bk">‹ Retour</button><span class="kicker o" style="margin:0">${esc(S.data.election.name)}</span><span style="width:60px"></span></div>
+  <img class="photo" src="${esc(c.photo)}" alt="${esc(c.name)}"><h1 class="name">${esc(c.name)}</h1><p class="role">${esc(c.role)} • ${esc(c.klass)}</p>
+  <div class="vids">${c.videoPitchOk ? `<button class="vbtn" data-v="videoPitch">${PLAYW}<span>Play ${esc(c.pitchDur || '0:30')} Pitch</span></button>` : ''}
+  ${c.videoFullOk ? `<button class="vbtn" data-v="videoFull">${PLAYW}<span>Play ${esc(c.fullDur)}<br>Programme complet</span></button>` : ''}</div>
+  ${c.votes !== undefined ? `<div class="tiles"><div class="tile"><svg width="30" height="30" viewBox="0 0 24 24" fill="#C2410C"><rect x="3" y="11" width="5" height="10" rx="1"/><rect x="10" y="3" width="5" height="18" rx="1"/><rect x="17" y="8" width="5" height="13" rx="1"/></svg><div><b>${c.votes}</b><span>votes</span></div></div></div>` : ''}
+  <h2 style="margin-top:6px">Bio</h2><p class="bio">${esc(c.bio)}</p>
+  <h2>Programme — ${c.promises.length} promesse${c.promises.length > 1 ? 's' : ''} concrète${c.promises.length > 1 ? 's' : ''} <span style="color:var(--accent)">•</span></h2>
+  <div class="card"><ul class="promises" style="padding:0">${c.promises.map(p => `<li>${esc(p[0])}<small>• ${esc(p[1])}</small></li>`).join('')}</ul></div>
+  ${c.qa.length ? `<h2>Questions des étudiants</h2>` + c.qa.map(q => `<div class="card qa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.8"><path d="M4 5h16v11H9l-5 4z"/></svg><div>Q: ${esc(q[0])}<br>R: ${esc(q[1])}</div></div>`).join('') : ''}
+  ${voting ? `<div class="sticky"><button class="btn wide" id="vt">${m.voted && m.candidateId === c.id ? 'Ton vote actuel : ' + esc(c.name) : 'Voter pour ' + esc(c.name)}</button></div>` : ''}`;
+  $('#bk').onclick = viewList; if ($('#vt')) $('#vt').onclick = () => confirmVote(id);
+  app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => playVideo(id, b.dataset.v));
+}
+function playVideo(id, key) {
+  const c = S.data.candidates.find(x => x.id === id), d = document.createElement('div'); d.className = 'vid-bg';
+  d.innerHTML = `<video src="${esc(c[key])}" controls autoplay playsinline></video><button>Fermer</button>`;
+  d.querySelector('button').onclick = () => d.remove(); document.body.appendChild(d);
+}
+
+// ---------- vote ----------
+function confirmVote(id) {
+  const c = S.data.candidates.find(x => x.id === id), m = S.data.me;
+  if (m.voted && m.status === 'valid' && m.candidateId === id) return toast('Tu as déjà voté pour ' + c.name + '.');
+  if (m.voted && m.status === 'valid' && m.changesLeft <= 0) return toast('Tu as utilisé tous tes changements.');
+  const change = m.voted && m.status === 'valid';
+  const bg = document.createElement('div'); bg.className = 'sheet-bg';
+  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><h3>${change ? 'Changer ton vote ?' : 'Confirmer ton vote'}</h3>
+  <p>${change ? `Tu passes de <b>${esc(m.candidateName)}</b> à <b>${esc(c.name)}</b>. Il te restera ${m.changesLeft - 1} changement${m.changesLeft - 1 > 1 ? 's' : ''}.` : `Tu votes pour <b>${esc(c.name)}</b> (${esc(c.role)}). Tu pourras changer ${S.data.maxChanges} fois au maximum.`}</p>
+  <div class="row"><button class="btn ghost" id="no">Annuler</button><button class="btn" id="yes">Valider</button></div></div>`;
+  document.body.appendChild(bg);
+  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  bg.querySelector('#no').onclick = () => bg.remove();
+  bg.querySelector('#yes').onclick = async () => {
+    const b = bg.querySelector('#yes'); b.disabled = true; b.textContent = '…';
+    try {
+      if (!S.device) S.device = await VogtDevice();
+      const r = await api('/api/vote', { electionId: S.data.election.id, candidateId: id, fp: S.device.fp, deviceId: S.device.deviceId });
+      S.data.me = r.me; bg.remove(); toast(r.changed ? 'Vote modifié.' : 'Vote enregistré. Merci !');
+      S.view === 'detail' ? viewDetail(id) : viewList();
+    } catch (e) {
+      bg.remove();
+      if (e.status === 401) return viewLogin(e.message);
+      if (e.data && e.data.me) S.data.me = e.data.me;
+      if (e.data && e.data.blocked) return viewBlocked(e.message);
+      toast(e.message);
+    }
+  };
+}
+function viewBlocked(msg) {
+  S.view = 'blocked';
+  app.innerHTML = `${head()}<h1>Vote<br><em>bloqué.</em></h1><p class="sub">${esc(msg)}</p>
+  <div class="banner warn">Un seul téléphone peut voter une fois par élection. Si tu penses qu'il s'agit d'une erreur, contacte le BDE.</div>`;
+}
+
+// ---------- démarrage ----------
+(async () => { try { const r = await api('/api/me'); r.in ? loadList() : viewLogin(); } catch (e) { viewLogin(); } })();
+</script>
+</body>
+</html>

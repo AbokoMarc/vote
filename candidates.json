@@ -1,0 +1,17 @@
+[
+  {"id":"mendo","name":"A. MENDO","role":"Présidente","klass":"N4 GI","photo":"/photos/mendo.svg",
+   "videoPitch":"/videos/mendo-pitch.mp4","videoFull":"/videos/mendo-full.mp4","pitchDur":"0:30","fullDur":"2:14",
+   "bio":"Étudiante en 4e année Génie Industriel, engagée pour un campus plus inclusif et dynamique. Passionnée par l'entrepreneuriat étudiant et l'impact local. Je me présente pour représenter chaque voix et améliorer la vie étudiante au quotidien.",
+   "promises":[["bourse stage","Déployer une bourse stage pour 50 étudiants/an"],["budget public","Transparence du budget public & tableau de suivi en live"],["salle 24/24","Ouverture salle 24/24 pour révisions & projets"],["event tech","Série d'événements tech & networking mensuels"],["cantine 500F","Repas cantine à 500F, local & durable"]],
+   "qa":[["Comment vas-tu soutenir les alternants ?","Création d'un réseau de mentors pros + jobboard dédié."]]},
+  {"id":"leroux","name":"K. LEROUX","role":"Vice-président","klass":"N4 GI","photo":"/photos/leroux.svg",
+   "videoPitch":"/videos/leroux-pitch.mp4","videoFull":null,"pitchDur":"0:30","fullDur":null,
+   "bio":"Étudiant en N4 GI, je veux un BDE plus proche du terrain: des projets visibles, des comptes ouverts et des soirées qui rassemblent toutes les promos.",
+   "promises":[["transport","Navettes partagées pour les soirées et les événements"],["clubs","Un budget garanti pour chaque club étudiant"],["sport","Tournois inter-promos chaque trimestre"],["entraide","Tutorat gratuit entre étudiants de N1 à N4"],["écoute","Une permanence BDE chaque semaine"]],
+   "qa":[["Comment financer ces projets ?","Partenariats locaux et publication de chaque dépense."]]},
+  {"id":"djoko","name":"S. DJOKO","role":"Secrétaire","klass":"N4 GI","photo":"/photos/djoko.svg",
+   "videoPitch":"/videos/djoko-pitch.mp4","videoFull":null,"pitchDur":"0:30","fullDur":null,
+   "bio":"Organisée et à l'écoute, je veux simplifier la communication du BDE: une information claire, des comptes rendus publics et des démarches rapides.",
+   "promises":[["comptes rendus","Publication de chaque réunion sous 48h"],["guichet","Guichet unique pour les demandes étudiantes"],["agenda","Agenda commun de tous les événements du campus"],["accueil","Parcours d'accueil pour les nouveaux"],["archives","Archives numériques accessibles à tous"]],
+   "qa":[["Comment garantir la transparence ?","Un tableau de bord public mis à jour chaque semaine."]]}
+]
