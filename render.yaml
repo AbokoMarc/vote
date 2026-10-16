@@ -34,5 +34,7 @@ services:
         sync: false
       - key: MAIL_FROM
         sync: false
+      - key: SEED_DEMO
+        value: "0"
       - key: ELIGIBLE_VOTERS
         value: "1000"

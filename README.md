@@ -28,7 +28,7 @@ Un hébergeur gratuit n'a pas de disque durable, donc :
 - Les vidéos de démonstration de `public/videos` sont de simples fichiers du dépôt.
 
 ## Test en local
-`npm install`, `cp .env.example .env`, `npm start`. Sans variables TURSO_*, un fichier `vogt.db` local est utilisé.
+`npm install`, `cp .env.example .env`, `npm start` (SEED_DEMO=1 crée une élection de démonstration ; en ligne laisse 0 et crée tes élections dans /admin). Sans variables TURSO_*, un fichier `vogt.db` local est utilisé.
 
 ## Élections, sécurité (rappel)
 - Plusieurs élections, chacune avec 4 dates appliquées par le serveur. Dates de vote verrouillées pour le BDE dès le premier vote.

@@ -15,6 +15,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const app = $('#app');
+const CAND = location.pathname.replace(/\/$/, '') === '/candidat';
 const S = { email: '', data: null, device: null, view: 'login' };
 const PLAY = '<svg viewBox="0 0 10 10"><path d="M1 0l9 5-9 5z"/></svg>';
 const PLAYW = '<svg viewBox="0 0 10 10"><path d="M1 0l9 5-9 5z"/></svg>';
@@ -40,8 +41,8 @@ function head() { return `<div class="kicker">VOGT ELECTIONS 2026</div>${MAP}`; 
 // ---------- connexion ----------
 function viewLogin(err) {
   S.view = 'login';
-  app.innerHTML = `${head()}<h1>Votre campus.<br><em>Votre voix.</em></h1>
-  <p class="sub">Entre ton email pour recevoir ton code à 4 chiffres.</p>
+  app.innerHTML = `${head()}<h1>${CAND ? 'Deviens<br><em>candidat.</em>' : 'Votre campus.<br><em>Votre voix.</em>'}</h1>
+  <p class="sub">${CAND ? 'Entre ton email pour déposer ta candidature. Tu recevras un code à 4 chiffres.' : 'Entre ton email pour recevoir ton code à 4 chiffres.'}</p>
   <input class="field" id="em" type="email" inputmode="email" autocomplete="email" placeholder="ton.email@campus.fr" value="${esc(S.email)}">
   <p class="err" id="err">${esc(err || '')}</p>
   <button class="btn wide" id="go">Recevoir mon code</button>
@@ -88,19 +89,26 @@ function phaseLine(e) {
 }
 async function loadList() {
   try { S.elections = (await api('/api/elections')).elections; } catch (e) { return viewLogin(e.status === 401 ? '' : e.message); }
+  if (CAND) {
+    const open = S.elections.filter(e => e.phase === 'registration');
+    S.elections = open;
+    if (open.length === 1) return openElection(open[0].id);
+  }
   viewElections();
 }
 function viewElections() {
   S.view = 'elections'; window.scrollTo(0, 0);
-  app.innerHTML = `${head()}<h1>Votre campus.<br><em>Votre voix.</em></h1><p class="sub">Choisis une élection.</p>
+  app.innerHTML = `${head()}<h1>Votre campus.<br><em>Votre voix.</em></h1><p class="sub">${CAND ? (S.elections.length ? 'Choisis l\'élection pour laquelle tu te présentes.' : 'Aucune candidature n\'est ouverte pour le moment.') : 'Choisis une élection.'}</p>
   ${S.elections.length ? S.elections.map(e => `<div class="card cand el" data-id="${e.id}" tabindex="0"><div class="meta"><p class="n">${esc(e.name)}</p>
-    <div class="r">${esc(phaseLine(e))}</div><span class="play ph-${e.phase}">${PH[e.phase]}</span>${e.voted ? ' <span class="play" style="background:#E4F4E4;color:#1d5a1d">Tu as voté</span>' : ''}</div><span style="font-size:26px;color:var(--accent)">›</span></div>`).join('') : '<div class="banner">Aucune élection pour le moment.</div>'}
+    <div class="r">${esc(phaseLine(e))}</div><span class="play ph-${e.phase}">${PH[e.phase]}</span>${e.voted ? ' <span class="play" style="background:#E4F4E4;color:#1d5a1d">Tu as voté</span>' : ''}</div><span style="font-size:26px;color:var(--accent)">›</span></div>`).join('') : (CAND ? '<div class="banner">Reviens plus tard, ou ouvre <a href="/" style="color:var(--accent)">la page des élections</a>.</div>' : '<div class="banner">Aucune élection pour le moment.</div>')}
   <p class="note"><button class="link" id="out">Changer de compte</button></p>`;
   app.querySelectorAll('.el').forEach(el => { el.onclick = () => openElection(+el.dataset.id); el.onkeydown = e => e.key === 'Enter' && el.onclick(); });
   $('#out').onclick = async () => { await api('/api/logout', {}); viewLogin(); };
 }
 async function openElection(id) {
   try { S.data = await api('/api/elections/' + id); } catch (e) { return e.status === 401 ? viewLogin('') : toast(e.message); }
+  const c = S.data.myCandidacy;
+  if (CAND && S.data.election.phase === 'registration' && !(c && c.status === 'approved')) return viewApply();
   viewList();
 }
 function status() {

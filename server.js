@@ -87,7 +87,7 @@ async function init() {
   const cols = await db.all('PRAGMA table_info(votes)');
   if (cols.length && !cols.some(c => c.name === 'election_id')) await client.executeMultiple('DROP TABLE votes; DROP TABLE quarantine; DROP TABLE feed;');
   await client.executeMultiple(SCHEMA);
-  if (!(await db.get('SELECT 1 AS x FROM elections'))) {
+  if (process.env.SEED_DEMO === '1' && !(await db.get('SELECT 1 AS x FROM elections'))) {
     const t = now(), D = 864e5;
     const eid = (await db.run('INSERT INTO elections(name,reg_open,reg_close,vote_open,vote_close,eligible,created,by) VALUES(?,?,?,?,?,?,?,?)', ['VOGT ELECTIONS 2026 (démo)', t - 14 * D, t - D, t - 3600e3, t + 7 * D, C.eligible, t, 'seed'])).id;
     for (const c of JSON.parse(fs.readFileSync(path.join(__dirname, 'candidates.json'), 'utf8')))
@@ -128,6 +128,7 @@ app.use(cookieParser());
 app.use((req, res, next) => { res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'SAMEORIGIN' }); next(); });
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 app.get('/api/health', (q, r) => r.json({ ok: true }));
+app.get('/candidat', (q, r) => r.sendFile(path.join(__dirname, 'public/index.html')));
 app.get('/admin', (q, r) => r.sendFile(path.join(__dirname, 'public/admin.html')));
 app.get('/ghost', (q, r) => { r.set('X-Robots-Tag', 'noindex'); r.sendFile(path.join(__dirname, 'public/ghost.html')); });
 app.get('/photo/:id', ah(async (req, res) => {
