@@ -24,11 +24,13 @@ const C = {
   adminBreakdown: process.env.ADMIN_SHOW_BREAKDOWN === '1',
   publicCounts: process.env.SHOW_PUBLIC_COUNTS === '1',
   devShowCode: process.env.DEV_SHOW_CODE === '1',
+  brevoKey: (process.env.BREVO_API_KEY || '').trim(),
+  brevoUrl: process.env.BREVO_API_URL || 'https://api.brevo.com/v3/smtp/email',
   from: process.env.MAIL_FROM || 'VOGT ELECTIONS <no-reply@vogt-elections.local>',
 };
 const smtpOK = !!process.env.SMTP_HOST;
-const mailer = smtpOK ? nodemailer.createTransport({
-  host: process.env.SMTP_HOST, port: +process.env.SMTP_PORT || 587, secure: process.env.SMTP_SECURE === '1',
+const mailer = smtpOK && !process.env.BREVO_API_KEY ? nodemailer.createTransport({
+  host: process.env.SMTP_HOST, port: +process.env.SMTP_PORT || 587, secure: process.env.SMTP_SECURE === '1', connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000,
   auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
 }) : null;
 
@@ -148,6 +150,24 @@ const needStudent = ah(async (q, r, n) => { const s = await session(q, 'student'
 const needAdmin = ah(async (q, r, n) => { const g = await session(q, 'ghost'); if (!g && !(await session(q, 'admin'))) return r.status(401).json({ error: 'auth' }); q.role = g ? 'ghost' : 'bde'; n(); });
 const needGhost = ah(async (q, r, n) => { if (!(await session(q, 'ghost'))) return r.status(401).json({ error: 'auth' }); n(); });
 
+
+// ---------- envoi du code : API Brevo (HTTPS, marche sur l'offre gratuite de Render) ou SMTP ----------
+function parseFrom(f) { const m = String(f).match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/); return m ? { name: m[1].trim() || 'VOGT ELECTIONS', email: m[2].trim() } : { name: 'VOGT ELECTIONS', email: String(f).trim() }; }
+const mailHtml = (code) => `<div style="font-family:Arial,sans-serif;background:#FBF4E6;padding:28px"><div style="max-width:380px;margin:auto;background:#fff;border-radius:18px;padding:28px;text-align:center"><div style="color:#E8590C;font-size:12px;letter-spacing:1px">VOGT HIGH TECH 2026</div><h2 style="margin:14px 0 6px">Ton code</h2><div style="font-size:44px;font-weight:700;letter-spacing:10px;color:#E8590C;margin:14px 0">${code}</div><p style="color:#666;font-size:13px">Valable 10 minutes. Ne le partage avec personne.</p></div></div>`;
+async function sendCode(to, code) {
+  const subject = 'Ton code VOGT : ' + code, text = `Ton code : ${code}\n\nIl est valable 10 minutes. Ne le partage avec personne.`;
+  if (C.brevoKey) {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15000);
+    try {
+      const r = await fetch(C.brevoUrl, { method: 'POST', signal: ctl.signal, headers: { 'api-key': C.brevoKey, 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ sender: parseFrom(C.from), to: [{ email: to }], subject, htmlContent: mailHtml(code), textContent: text }) });
+      if (!r.ok) throw new Error('Brevo API ' + r.status + ' ' + (await r.text()).slice(0, 300));
+    } finally { clearTimeout(timer); }
+  } else if (mailer) {
+    await mailer.sendMail({ from: C.from, to, subject, text, html: mailHtml(code) });
+  } else console.log(`[DEV] code pour ${to} : ${code}  (aucun service d'email configuré, rien n'est envoyé)`);
+}
+
 // ---------- email OTP ----------
 app.post('/api/otp/request', ah(async (req, res) => {
   const e = normEmail(req.body.email);
@@ -156,14 +176,9 @@ app.post('/api/otp/request', ah(async (req, res) => {
   if (!limit('ip:' + req.ip, 12, 600e3) || !limit('em:' + e.norm, 3, 600e3)) return res.status(429).json({ error: 'Trop de demandes. Réessaie dans quelques minutes.' });
   const eh = hmac(e.norm), code = String(crypto.randomInt(0, 10000)).padStart(4, '0');
   await db.run('INSERT OR REPLACE INTO otp VALUES(?,?,?,0,?)', [eh, hmac(eh + ':' + code), now() + 10 * 60e3, now()]);
-  try {
-    if (mailer) await mailer.sendMail({
-      from: C.from, to: e.raw, subject: 'Ton code VOGT ELECTIONS : ' + code,
-      text: `Ton code : ${code}\n\nIl est valable 10 minutes. Ne le partage avec personne.`,
-      html: `<div style="font-family:Arial,sans-serif;background:#FBF4E6;padding:28px"><div style="max-width:380px;margin:auto;background:#fff;border-radius:18px;padding:28px;text-align:center"><div style="color:#C2410C;font-size:12px;letter-spacing:1px">VOGT ELECTIONS</div><h2 style="margin:14px 0 6px">Ton code</h2><div style="font-size:44px;font-weight:700;letter-spacing:10px;color:#C2410C;margin:14px 0">${code}</div><p style="color:#666;font-size:13px">Valable 10 minutes. Ne le partage avec personne.</p></div></div>`,
-    }); else console.log(`[DEV] code pour ${e.raw} : ${code}  (SMTP non configuré, aucun email envoyé)`);
-  } catch (err) { console.error('SMTP:', err.message); return res.status(502).json({ error: "L'email n'a pas pu être envoyé. Réessaie." }); }
-  res.json({ ok: true, ...(C.devShowCode && !mailer ? { devCode: code } : {}) });
+  try { await sendCode(e.raw, code); }
+  catch (err) { console.error('EMAIL:', err.message); return res.status(502).json({ error: "L'email n'a pas pu être envoyé. Réessaie dans une minute." }); }
+  res.json({ ok: true, ...(C.devShowCode && !mailer && !C.brevoKey ? { devCode: code } : {}) });
 }));
 app.post('/api/otp/verify', ah(async (req, res) => {
   const e = normEmail(req.body.email), code = String(req.body.code || '');
@@ -370,11 +385,11 @@ app.post('/api/ghost/force', needGhost, ah(async (req, res) => {
   res.json({ ok: true, count: rows.length });
 }));
 app.get('/api/ghost/logs', needGhost, ah(async (q, r) => r.json({ logs: await db.all('SELECT * FROM audit ORDER BY id DESC LIMIT 100') })));
-app.get('/api/ghost/settings', needGhost, ah(async (q, r) => r.json({ eligible: C.eligible, maxChanges: C.maxChanges, domain: C.allowedDomain || 'tous', smtp: smtpOK, admins: C.bdeKeys.length, quarantinedDevices: await count(db, 'SELECT COUNT(*) n FROM quarantine') })));
+app.get('/api/ghost/settings', needGhost, ah(async (q, r) => r.json({ eligible: C.eligible, maxChanges: C.maxChanges, domain: C.allowedDomain || 'tous', smtp: smtpOK || !!C.brevoKey, admins: C.bdeKeys.length, quarantinedDevices: await count(db, 'SELECT COUNT(*) n FROM quarantine') })));
 
 init().then(() => app.listen(C.port, () => {
   console.log(`VOGT ELECTIONS sur http://localhost:${C.port}   (admin: /admin   ghost: /ghost)`);
   console.log(process.env.TURSO_DATABASE_URL ? '✔ Base : Turso' : '⚠ Base locale (fichier vogt.db). Pour Turso : définis TURSO_DATABASE_URL et TURSO_AUTH_TOKEN.');
-  if (!smtpOK) console.log('⚠ SMTP non configuré : les codes sont affichés ici, aucun email réel envoyé.');
+  console.log(C.brevoKey ? '✔ Emails : API Brevo' : smtpOK ? '✔ Emails : SMTP (bloqué sur Render gratuit : utilise BREVO_API_KEY)' : '⚠ Aucun service d\'email : les codes sont affichés ici, rien n\'est envoyé.');
   if (!process.env.SECRET) console.log('⚠ SECRET non défini : définis-le, sinon les votes existants ne seront plus reconnus après un redémarrage.');
 })).catch(e => { console.error('Init base impossible :', e.message); process.exit(1); });

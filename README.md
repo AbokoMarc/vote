@@ -8,6 +8,9 @@ Pages : `/` étudiant · `/admin` BDE · `/ghost` quarantaine (URL non liée).
 3. Les tables se créent toutes seules au premier démarrage.
 
 ## 2. Emails (gratuit)
+**Important : Render bloque le SMTP (ports 25, 465, 587) sur l'offre gratuite.** Utilise l'API Brevo : crée une clé API (Brevo > SMTP et API > Clés API > Générer) et mets-la dans `BREVO_API_KEY`, avec `MAIL_FROM=VOGT HIGH TECH <ton-adresse-verifiee>`. Les variables SMTP_* ne servent alors plus.
+Photo du campus : dépose un fichier `public/campus.jpg` (format paysage). Sans fichier, une illustration est affichée.
+(Ancienne méthode SMTP, hors Render gratuit :)
 Prends un service SMTP gratuit (Brevo, Resend, Mailjet...). Vérifie l'adresse d'expéditeur chez eux et note leur limite d'envois par jour.
 Variables : SMTP_HOST, SMTP_PORT (587), SMTP_USER, SMTP_PASS, MAIL_FROM.
 Sans SMTP, le code s'affiche dans les logs (mode test uniquement).

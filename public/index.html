@@ -21,34 +21,41 @@ const PLAY = '<svg viewBox="0 0 10 10"><path d="M1 0l9 5-9 5z"/></svg>';
 const PLAYW = '<svg viewBox="0 0 10 10"><path d="M1 0l9 5-9 5z"/></svg>';
 
 VogtDevice().then(d => S.device = d).catch(() => {});
+fetch('/api/health').catch(() => {});
 async function api(path, body) {
-  const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 40000);
+  let r;
+  try { r = await fetch(path, { ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}), signal: ctl.signal }); }
+  catch (e) { const er = new Error(e.name === 'AbortError' ? 'Le serveur met trop de temps à répondre (il se réveille). Réessaie dans 30 secondes.' : 'Pas de connexion internet. Vérifie ton réseau et réessaie.'); er.status = 0; throw er; }
+  finally { clearTimeout(timer); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(j.error || 'Erreur'); e.status = r.status; e.data = j; throw e; }
+  if (!r.ok) { const e = new Error(j.error || 'Erreur du serveur. Réessaie.'); e.status = r.status; e.data = j; throw e; }
   return j;
 }
 function toast(t) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 3200); }
 
-const MAP = `<svg class="map" viewBox="0 0 176 128" role="img" aria-label="Carte du campus"><rect width="176" height="128" fill="#CFE5C4"/>
-<path d="M0 90C40 70 70 96 110 70s50-20 66-30v88H0z" fill="#BFDDB2"/><path d="M-5 30C30 40 50 20 90 34s60 8 90-6" stroke="#fff" stroke-width="4" fill="none" opacity=".9"/>
-<path d="M60 -5C66 30 52 60 70 90s6 30 14 44" stroke="#F4EFD8" stroke-width="3.5" fill="none"/><path d="M0 64C40 60 80 74 120 58s40-8 60-2" stroke="#F4EFD8" stroke-width="3" fill="none"/>
-<circle cx="30" cy="100" r="16" fill="#B7D8AA" opacity=".8"/><circle cx="140" cy="94" r="13" fill="#B7D8AA" opacity=".8"/>
-<g font-size="8.5" fill="#3d4a3a" font-family="Arial"><text x="32" y="22">Schlier</text><text x="116" y="18">Wolfegg</text><text x="14" y="116">Waldburg</text></g>
-<path d="M88 40c-7 0-12 5-12 11 0 8 12 20 12 20s12-12 12-20c0-6-5-11-12-11z" fill="#D9432B"/><circle cx="88" cy="51" r="4.2" fill="#fff"/></svg>`;
+window.ILLU = `<svg viewBox="0 0 320 214" role="img" aria-label="Campus" style="display:block;width:100%;height:auto;border-radius:16px"><defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#CFE6F6"/><stop offset="1" stop-color="#F6EBD7"/></linearGradient><linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8FB6CF"/><stop offset="1" stop-color="#5E8CA8"/></linearGradient></defs>
+<rect width="320" height="214" fill="url(#sk)"/><rect y="170" width="320" height="44" fill="#E4D9C3"/><rect y="176" width="320" height="38" fill="#D9CCB2"/>
+<rect x="46" y="62" width="228" height="112" fill="#F3EEE4"/><rect x="46" y="62" width="228" height="10" fill="#D8CDB8"/>
+<g fill="url(#gl)"><rect x="58" y="82" width="42" height="26" rx="2"/><rect x="108" y="82" width="42" height="26" rx="2"/><rect x="170" y="82" width="42" height="26" rx="2"/><rect x="220" y="82" width="42" height="26" rx="2"/><rect x="58" y="120" width="42" height="26" rx="2"/><rect x="108" y="120" width="42" height="26" rx="2"/><rect x="170" y="120" width="42" height="26" rx="2"/><rect x="220" y="120" width="42" height="26" rx="2"/></g>
+<rect x="144" y="124" width="32" height="50" fill="#E8590C" opacity=".9"/><rect x="30" y="52" width="60" height="6" fill="#C9BEA8"/>
+<g fill="#4F7A3F"><circle cx="24" cy="150" r="22"/><circle cx="300" cy="146" r="24"/></g><g fill="#6B4E32"><rect x="22" y="160" width="4" height="16"/><rect x="298" y="160" width="4" height="16"/></g>
+<g><circle cx="92" cy="176" r="5" fill="#3B2A20"/><rect x="87" y="181" width="10" height="20" rx="4" fill="#E8590C"/><circle cx="130" cy="180" r="5" fill="#5A3A28"/><rect x="125" y="185" width="10" height="20" rx="4" fill="#2F4B6B"/><circle cx="205" cy="178" r="5" fill="#3B2A20"/><rect x="200" y="183" width="10" height="20" rx="4" fill="#F2F2F2"/><circle cx="240" cy="182" r="5" fill="#4A3224"/><rect x="235" y="187" width="10" height="20" rx="4" fill="#3E7A52"/></g></svg>`;
+const MAP = `<div class="hero"><img src="/campus.jpg" alt="Campus" onerror="this.parentNode.innerHTML=window.ILLU"></div>`;
 
-function head() { return `<div class="kicker">VOGT ELECTIONS 2026</div>${MAP}`; }
+function head() { return `<div class="kicker">VOGT HIGH TECH 2026</div>${MAP}`; }
 
 // ---------- connexion ----------
 function viewLogin(err) {
   S.view = 'login';
   app.innerHTML = `${head()}<h1>${CAND ? 'Deviens<br><em>candidat.</em>' : 'Votre campus.<br><em>Votre voix.</em>'}</h1>
   <p class="sub">${CAND ? 'Entre ton email pour déposer ta candidature. Tu recevras un code à 4 chiffres.' : 'Entre ton email pour recevoir ton code à 4 chiffres.'}</p>
-  <input class="field" id="em" type="email" inputmode="email" autocomplete="email" placeholder="ton.email@campus.fr" value="${esc(S.email)}">
+  <div class="icf"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b6458" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M4 7l8 6 8-6"/></svg><input class="field" id="em" type="email" inputmode="email" autocomplete="email" placeholder="ton.email@campus.fr" value="${esc(S.email)}"></div>
   <p class="err" id="err">${esc(err || '')}</p>
   <button class="btn wide" id="go">Recevoir mon code</button>
   <p class="note">Un vote par étudiant, un téléphone par vote.</p>`;
   const go = async () => {
-    const b = $('#go'); S.email = $('#em').value.trim(); b.disabled = true; b.textContent = 'Envoi…';
+    const b = $('#go'); S.email = $('#em').value.trim(); b.disabled = true; b.textContent = 'Envoi en cours… (jusqu\'à 30 s)';
     try { await api('/api/otp/request', { email: S.email }); viewCode(); }
     catch (e) { $('#err').textContent = e.message; b.disabled = false; b.textContent = 'Recevoir mon code'; }
   };

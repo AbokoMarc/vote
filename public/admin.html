@@ -50,7 +50,7 @@ function ghostBar() { return role === 'ghost' ? `<p style="margin:0 0 8px"><a cl
 
 function login(err) {
   clearInterval(timer);
-  app.innerHTML = `<div class="kicker o" style="margin-top:26px">VOGT ELECTIONS</div><h1 style="font-size:32px;margin:14px 0 8px">Admin BDE</h1><p class="sub">Crée les élections, valide les candidatures, surveille les chiffres.</p>
+  app.innerHTML = `<div class="kicker o" style="margin-top:26px">VOGT HIGH TECH 2026</div><h1 style="font-size:32px;margin:14px 0 8px">Admin BDE</h1><p class="sub">Crée les élections, valide les candidatures, surveille les chiffres.</p>
   <input class="field" id="k" type="password" autocomplete="current-password" placeholder="Clé BDE"><p class="err" id="e">${esc(err || '')}</p><button class="btn wide" id="g">Entrer</button>`;
   const go = async () => { const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: $('#k').value }) }); if (r.ok) return home(); const j = await r.json().catch(() => ({})); $('#e').textContent = j.error || 'Erreur'; };
   $('#g').onclick = go; $('#k').onkeydown = e => e.key === 'Enter' && go();
